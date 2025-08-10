@@ -1,5 +1,5 @@
-body{
-    font-family: sans-serif
+body {
+    font-family: sans-serif;
 }
 
 .menu-item {
@@ -11,13 +11,13 @@ body{
 }
 
 .container {
-  display: flex;
+    display: flex;
 }
 
 .hover {
-    background: lightgray
+    background: lightgray;
 }
 
-.selected{
-    background: gold
+.selected {
+    background: gold;
 }
