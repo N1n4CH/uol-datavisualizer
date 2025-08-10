@@ -21,7 +21,7 @@ function ClimateChange() {
         // margin size to make space for axis and tick labels on the canvas.
         leftMargin: marginSize * 2,
         rightMargin: width - marginSize,
-        topMargin: marginSize + 50, // Extra space for title
+        topMargin: marginSize + 50,
         bottomMargin: height - marginSize * 2,
         pad: 5,
 
@@ -45,6 +45,39 @@ function ClimateChange() {
     // Property to represent whether data has been loaded.
     this.loaded = false;
 
+    // Fallback hardcoded data in case CSV fails
+    this.fallbackData = [
+        { year: 1880, temperature: -0.2 },
+        { year: 1885, temperature: -0.25 },
+        { year: 1890, temperature: -0.3 },
+        { year: 1895, temperature: -0.22 },
+        { year: 1900, temperature: -0.1 },
+        { year: 1905, temperature: -0.28 },
+        { year: 1910, temperature: -0.4 },
+        { year: 1915, temperature: -0.15 },
+        { year: 1920, temperature: -0.2 },
+        { year: 1925, temperature: -0.18 },
+        { year: 1930, temperature: -0.12 },
+        { year: 1935, temperature: -0.15 },
+        { year: 1940, temperature: 0.05 },
+        { year: 1945, temperature: -0.02 },
+        { year: 1950, temperature: -0.18 },
+        { year: 1955, temperature: -0.15 },
+        { year: 1960, temperature: -0.05 },
+        { year: 1965, temperature: -0.12 },
+        { year: 1970, temperature: 0.02 },
+        { year: 1975, temperature: -0.05 },
+        { year: 1980, temperature: 0.25 },
+        { year: 1985, temperature: 0.1 },
+        { year: 1990, temperature: 0.42 },
+        { year: 1995, temperature: 0.43 },
+        { year: 2000, temperature: 0.58 },
+        { year: 2005, temperature: 0.65 },
+        { year: 2010, temperature: 0.7 },
+        { year: 2015, temperature: 0.85 },
+        { year: 2020, temperature: 1.02 },
+    ];
+
     // Preload the data. This function is called automatically by the
     // gallery when a visualisation is added.
     this.preload = function () {
@@ -56,51 +89,85 @@ function ClimateChange() {
             // Callback function to set the value
             // this.loaded to true.
             function (table) {
+                console.log("CSV loaded successfully");
                 self.loaded = true;
+            },
+            // Error callback - use fallback data
+            function (error) {
+                console.log("CSV loading failed, using fallback data:", error);
+                self.loaded = true; // Still set to true so app works
+                self.usesFallback = true;
             }
         );
     };
 
     this.setup = function () {
-        // Font defaults.
         textSize(16);
 
-        if (!this.loaded) {
-            console.log("Data not loaded in setup");
-            return;
+        // Convert CSV data to simple array format, or use fallback
+        this.processedData = [];
+
+        if (
+            this.data &&
+            this.data.getRowCount &&
+            this.data.getRowCount() > 0 &&
+            !this.usesFallback
+        ) {
+            console.log("Using CSV data with", this.data.getRowCount(), "rows");
+
+            // Convert CSV to simple array
+            for (var i = 0; i < this.data.getRowCount(); i++) {
+                this.processedData.push({
+                    year: this.data.getNum(i, "year"),
+                    temperature: this.data.getNum(i, "temperature"),
+                });
+            }
+
+            this.dataSource = "CSV";
+        } else {
+            console.log(
+                "Using fallback data with",
+                this.fallbackData.length,
+                "points"
+            );
+            this.processedData = this.fallbackData;
+            this.dataSource = "Fallback";
         }
 
-        // Set min and max years: assumes data is sorted by year.
-        this.minYear = this.data.getNum(0, "year");
-        this.maxYear = this.data.getNum(this.data.getRowCount() - 1, "year");
+        // Calculate data ranges
+        this.minYear = Math.min(...this.processedData.map((d) => d.year));
+        this.maxYear = Math.max(...this.processedData.map((d) => d.year));
+        this.minTemperature = Math.min(
+            ...this.processedData.map((d) => d.temperature)
+        );
+        this.maxTemperature = Math.max(
+            ...this.processedData.map((d) => d.temperature)
+        );
+        this.meanTemperature =
+            this.processedData.reduce((sum, d) => sum + d.temperature, 0) /
+            this.processedData.length;
 
-        // Find min and max temperature for mapping to canvas height.
-        this.minTemperature = min(this.data.getColumn("temperature"));
-        this.maxTemperature = max(this.data.getColumn("temperature"));
-
-        // Find mean temperature to plot average marker.
-        this.meanTemperature = mean(this.data.getColumn("temperature"));
-
-        console.log("Data loaded - Years:", this.minYear, "to", this.maxYear);
+        console.log("Data processed - Source:", this.dataSource);
+        console.log("Years:", this.minYear, "to", this.maxYear);
         console.log(
             "Temperature range:",
             this.minTemperature,
             "to",
             this.maxTemperature
         );
+        console.log("Data points:", this.processedData.length);
 
-        // Create sliders to control start and end years. Default to
-        // visualise full range.
+        // Create sliders
         this.startSlider = createSlider(
             this.minYear,
-            this.maxYear - 1,
+            this.maxYear - 5,
             this.minYear,
             1
         );
         this.startSlider.position(400, 10);
 
         this.endSlider = createSlider(
-            this.minYear + 1,
+            this.minYear + 5,
             this.maxYear,
             this.maxYear,
             1
@@ -111,12 +178,10 @@ function ClimateChange() {
         this.startLabel = createP("Start Year");
         this.startLabel.position(400, 30);
         this.startLabel.style("font-size", "12px");
-        this.startLabel.style("margin", "0");
 
         this.endLabel = createP("End Year");
         this.endLabel.position(600, 30);
         this.endLabel.style("font-size", "12px");
-        this.endLabel.style("margin", "0");
     };
 
     this.destroy = function () {
@@ -127,8 +192,12 @@ function ClimateChange() {
     };
 
     this.draw = function () {
-        if (!this.loaded) {
-            console.log("Data not yet loaded");
+        if (
+            !this.loaded ||
+            !this.processedData ||
+            this.processedData.length === 0
+        ) {
+            console.log("Data not ready for drawing");
             return;
         }
 
@@ -136,16 +205,34 @@ function ClimateChange() {
         this.startYear = this.startSlider.value();
         this.endYear = this.endSlider.value();
 
-        // Prevent slider ranges overlapping.
+        // Prevent slider ranges overlapping
         if (this.startYear >= this.endYear) {
-            this.startSlider.value(this.endYear - 1);
-            this.startYear = this.endYear - 1;
+            this.startSlider.value(this.endYear - 5);
+            this.startYear = this.endYear - 5;
         }
 
         // Draw title
-        this.drawTitle();
+        fill(0);
+        noStroke();
+        textAlign("center", "center");
+        textSize(18);
+        text("Global Surface Temperature Anomalies", width / 2, 50);
 
-        // Draw all y-axis tick labels.
+        textSize(12);
+        fill(100);
+        text(
+            "Temperature variations from long-term average (°C) - " +
+                this.dataSource +
+                " Data",
+            width / 2,
+            95
+        );
+
+        // Draw axes
+        drawAxis(this.layout);
+        drawAxisLabels(this.xAxisLabel, this.yAxisLabel, this.layout);
+
+        // Draw y-axis labels
         drawYAxisTickLabels(
             this.minTemperature,
             this.maxTemperature,
@@ -154,13 +241,7 @@ function ClimateChange() {
             1
         );
 
-        // Draw x and y axis.
-        drawAxis(this.layout);
-
-        // Draw x and y axis labels.
-        drawAxisLabels(this.xAxisLabel, this.yAxisLabel, this.layout);
-
-        // Plot average line.
+        // Draw average line
         stroke(150);
         strokeWeight(1);
         line(
@@ -181,94 +262,86 @@ function ClimateChange() {
             this.mapTemperatureToHeight(this.meanTemperature)
         );
 
-        // Draw the temperature data
-        this.drawTemperatureData();
+        // Draw the temperature visualization
+        this.drawTemperatureVisualization();
 
-        // Display current range info
-        this.displayRangeInfo();
+        // Show info
+        fill(0);
+        noStroke();
+        textAlign("left", "bottom");
+        textSize(10);
+        text(
+            "Showing: " +
+                this.startYear +
+                " - " +
+                this.endYear +
+                " | Data points: " +
+                this.processedData.length +
+                " (" +
+                this.dataSource +
+                ")",
+            this.layout.leftMargin,
+            height - 5
+        );
     };
 
-    this.drawTemperatureData = function () {
-        var previous = null;
+    this.drawTemperatureVisualization = function () {
+        // Filter data to selected range
+        var filteredData = this.processedData.filter(
+            (d) => d.year >= this.startYear && d.year <= this.endYear
+        );
+
+        if (filteredData.length === 0) return;
+
         var segmentWidth =
             this.layout.plotWidth() / (this.endYear - this.startYear);
 
-        // First pass: draw background gradient rectangles
-        for (var i = 0; i < this.data.getRowCount(); i++) {
-            var current = {
-                year: this.data.getNum(i, "year"),
-                temperature: this.data.getNum(i, "temperature"),
-            };
+        // First pass: draw gradient background
+        noStroke();
+        for (var i = 0; i < filteredData.length; i++) {
+            var dataPoint = filteredData[i];
+            fill(this.mapTemperatureToColour(dataPoint.temperature));
 
-            // Only draw if within selected range
-            if (
-                current.year >= this.startYear &&
-                current.year <= this.endYear
-            ) {
-                // Draw background gradient rectangle
-                noStroke();
-                fill(this.mapTemperatureToColour(current.temperature));
-
-                var x = this.mapYearToWidth(current.year);
-                rect(
-                    x,
-                    this.layout.topMargin,
-                    segmentWidth,
-                    this.layout.plotHeight()
-                );
-            }
+            var x = this.mapYearToWidth(dataPoint.year);
+            rect(
+                x - segmentWidth / 2,
+                this.layout.topMargin,
+                segmentWidth,
+                this.layout.plotHeight()
+            );
         }
 
-        // Second pass: draw the line
-        previous = null;
-        stroke(0);
+        // Second pass: draw temperature line
+        var previous = null;
+        stroke(0, 0, 150);
         strokeWeight(2);
 
-        for (var i = 0; i < this.data.getRowCount(); i++) {
-            var current = {
-                year: this.data.getNum(i, "year"),
-                temperature: this.data.getNum(i, "temperature"),
-            };
+        for (var i = 0; i < filteredData.length; i++) {
+            var dataPoint = filteredData[i];
+            var x = this.mapYearToWidth(dataPoint.year);
+            var y = this.mapTemperatureToHeight(dataPoint.temperature);
 
-            // Only draw if within selected range
-            if (
-                current.year >= this.startYear &&
-                current.year <= this.endYear
-            ) {
-                if (previous != null) {
-                    // Draw line segment
-                    line(
-                        this.mapYearToWidth(previous.year),
-                        this.mapTemperatureToHeight(previous.temperature),
-                        this.mapYearToWidth(current.year),
-                        this.mapTemperatureToHeight(current.temperature)
-                    );
-                }
-
-                // Draw data points
-                fill(0);
-                noStroke();
-                ellipse(
-                    this.mapYearToWidth(current.year),
-                    this.mapTemperatureToHeight(current.temperature),
-                    4,
-                    4
-                );
-
-                previous = current;
-            } else if (current.year > this.endYear) {
-                break; // No need to continue if we've passed the end year
+            // Draw line to previous point
+            if (previous != null) {
+                line(previous.x, previous.y, x, y);
             }
+
+            // Draw data point
+            fill(0, 0, 150);
+            noStroke();
+            ellipse(x, y, 6, 6);
+
+            previous = { x: x, y: y };
         }
 
-        // Draw some year labels
+        // Draw some year labels on x-axis
         fill(0);
         noStroke();
         textAlign("center", "top");
         textSize(10);
 
         var yearStep = Math.max(
-            1,
+            5,
             Math.floor((this.endYear - this.startYear) / 8)
         );
         for (
@@ -276,46 +349,11 @@ function ClimateChange() {
             year <= this.endYear;
             year += yearStep
         ) {
-            var x = this.mapYearToWidth(year);
-            text(year, x, this.layout.bottomMargin + 5);
+            if (filteredData.some((d) => d.year === year)) {
+                var x = this.mapYearToWidth(year);
+                text(year, x, this.layout.bottomMargin + 5);
+            }
         }
-    };
-
-    this.drawTitle = function () {
-        fill(0);
-        noStroke();
-        textAlign("center", "center");
-        textSize(18);
-        text("Global Surface Temperature Anomalies", width / 2, 80);
-
-        textSize(12);
-        fill(100);
-        text(
-            "Temperature variations from long-term average (°C)",
-            width / 2,
-            95
-        );
-    };
-
-    this.displayRangeInfo = function () {
-        // Show current year range and some stats
-        fill(0);
-        noStroke();
-        textAlign("left", "bottom");
-        textSize(12);
-        text(
-            "Showing: " + this.startYear + " - " + this.endYear,
-            this.layout.leftMargin,
-            height - 5
-        );
-
-        // Show color legend
-        textAlign("right", "bottom");
-        text(
-            "Blue = Cooler | Red = Warmer",
-            this.layout.rightMargin,
-            height - 5
-        );
     };
 
     this.mapYearToWidth = function (value) {
@@ -339,20 +377,14 @@ function ClimateChange() {
     };
 
     this.mapTemperatureToColour = function (value) {
-        var red = map(
-            value,
-            this.minTemperature,
-            this.maxTemperature,
-            50, // Don't go to pure blue
-            255
-        );
+        var red = map(value, this.minTemperature, this.maxTemperature, 80, 255);
         var blue = map(
             value,
             this.minTemperature,
             this.maxTemperature,
-            255, // Pure blue for cold
-            50
-        ); // Little blue for warm
-        return color(red, 0, blue, 150); // Semi-transparent
+            255,
+            80
+        );
+        return color(red, 0, blue, 120);
     };
 }
