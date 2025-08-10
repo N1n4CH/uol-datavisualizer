@@ -10,9 +10,25 @@ function PayGapByJob2017() {
     this.loaded = false;
 
     // Graph properties.
-    this.pad = 20;
+    this.pad = 60; // Increased padding for labels
     this.dotSizeMin = 15;
     this.dotSizeMax = 40;
+
+    // Colors for different job categories
+    this.colors = [
+        color(255, 100, 100), // Tech - Red
+        color(100, 255, 100), // Creative - Green
+        color(100, 100, 255), // Business - Blue
+        color(255, 255, 100), // Finance - Yellow
+        color(255, 100, 255), // Operations - Magenta
+        color(100, 255, 255), // Legal - Cyan
+        color(255, 150, 100), // Healthcare - Orange
+        color(150, 255, 100), // Education - Light Green
+        color(200, 100, 255), // Retail - Purple
+        color(255, 200, 100), // Service - Peach
+        color(100, 200, 255), // Manual - Light Blue
+        color(200, 200, 100), // Transport - Olive
+    ];
 
     // Preload the data. This function is called automatically by the
     // gallery when a visualisation is added.
@@ -30,7 +46,9 @@ function PayGapByJob2017() {
         );
     };
 
-    this.setup = function () {};
+    this.setup = function () {
+        textSize(12);
+    };
 
     this.destroy = function () {};
 
@@ -40,7 +58,10 @@ function PayGapByJob2017() {
             return;
         }
 
-        // Draw the axes.
+        // Draw title
+        this.drawTitle();
+
+        // Draw the axes with labels
         this.addAxes();
 
         // Get data from the table object.
@@ -55,15 +76,8 @@ function PayGapByJob2017() {
         numJobs = stringsToNumbers(numJobs);
 
         // Set ranges for axes.
-        //
-        // Use full 100% for x-axis (proportion of women in roles).
         var propFemaleMin = 0;
         var propFemaleMax = 100;
-
-        // For y-axis (pay gap) use a symmetrical axis equal to the
-        // largest gap direction so that equal pay (0% pay gap) is in the
-        // centre of the canvas. Above the line means men are paid
-        // more. Below the line means women are paid more.
         var payGapMin = -20;
         var payGapMax = 20;
 
@@ -72,16 +86,11 @@ function PayGapByJob2017() {
         var numJobsMin = min(numJobs);
         var numJobsMax = max(numJobs);
 
-        fill(255);
         stroke(0);
         strokeWeight(1);
 
         for (i = 0; i < this.data.getRowCount(); i++) {
-            // Draw an ellipse for each point.
-            // x = propFemale
-            // y = payGap
-            // size = numJobs
-            // COMPLETED: Map all three dimensions to create bubble chart
+            // Map data to screen coordinates
             var x = map(
                 propFemale[i],
                 propFemaleMin,
@@ -104,17 +113,136 @@ function PayGapByJob2017() {
                 this.dotSizeMax
             );
 
+            // Color based on job type code
+            var jobTypeCode = this.data.getNum(i, "job_type_code");
+            fill(this.colors[jobTypeCode % this.colors.length]);
+
+            // Draw the circle
             ellipse(x, y, size, size);
+
+            // Add job label near the circle
+            fill(0);
+            noStroke();
+            textAlign("center", "center");
+            textSize(8);
+            text(jobs[i], x, y + size / 2 + 10);
         }
+
+        // Draw legend
+        this.drawLegend();
+    };
+
+    this.drawTitle = function () {
+        fill(0);
+        noStroke();
+        textAlign("center", "center");
+        textSize(16);
+        text("Pay Gap vs Gender Representation by Job (2017)", width / 2, 20);
+
+        textSize(12);
+        text("Circle size = Number of jobs", width / 2, 35);
     };
 
     this.addAxes = function () {
-        stroke(200);
+        stroke(150);
+        strokeWeight(2);
 
-        // Add vertical line.
-        line(width / 2, 0 + this.pad, width / 2, height - this.pad);
+        // Add vertical line at 50% (gender parity)
+        line(width / 2, this.pad, width / 2, height - this.pad);
 
-        // Add horizontal line.
-        line(0 + this.pad, height / 2, width - this.pad, height / 2);
+        // Add horizontal line at 0% pay gap (pay equality)
+        line(this.pad, height / 2, width - this.pad, height / 2);
+
+        // Add axis labels
+        fill(0);
+        noStroke();
+        textAlign("center", "center");
+        textSize(14);
+
+        // X-axis label
+        text("Proportion of Female Employees (%)", width / 2, height - 15);
+
+        // Y-axis label
+        push();
+        translate(15, height / 2);
+        rotate(-PI / 2);
+        text("Pay Gap (%)", 0, 0);
+        pop();
+
+        // Add axis tick labels
+        textSize(10);
+
+        // X-axis ticks
+        textAlign("center", "top");
+        for (var i = 0; i <= 100; i += 25) {
+            var x = map(i, 0, 100, this.pad, width - this.pad);
+            text(i + "%", x, height - this.pad + 5);
+        }
+
+        // Y-axis ticks
+        textAlign("right", "center");
+        for (var i = -20; i <= 20; i += 10) {
+            var y = map(i, -20, 20, height - this.pad, this.pad);
+            text(i + "%", this.pad - 5, y);
+        }
+
+        // Add quadrant labels
+        textAlign("center", "center");
+        textSize(11);
+        fill(100);
+
+        // Top right quadrant
+        text("Male-dominated\nMen paid more", width * 0.75, this.pad + 30);
+
+        // Top left quadrant
+        text("Female-dominated\nMen paid more", width * 0.25, this.pad + 30);
+
+        // Bottom right quadrant
+        text(
+            "Male-dominated\nWomen paid more",
+            width * 0.75,
+            height - this.pad - 30
+        );
+
+        // Bottom left quadrant
+        text(
+            "Female-dominated\nWomen paid more",
+            width * 0.25,
+            height - this.pad - 30
+        );
+    };
+
+    this.drawLegend = function () {
+        // Draw a simple legend showing circle sizes
+        var legendX = width - 150;
+        var legendY = 80;
+
+        fill(0);
+        noStroke();
+        textAlign("left", "center");
+        textSize(12);
+        text("Circle Size Legend:", legendX, legendY);
+
+        // Show small, medium, large circles
+        fill(150);
+        stroke(0);
+        strokeWeight(1);
+
+        ellipse(legendX + 20, legendY + 20, this.dotSizeMin, this.dotSizeMin);
+        ellipse(
+            legendX + 20,
+            legendY + 40,
+            (this.dotSizeMin + this.dotSizeMax) / 2,
+            (this.dotSizeMin + this.dotSizeMax) / 2
+        );
+        ellipse(legendX + 20, legendY + 65, this.dotSizeMax, this.dotSizeMax);
+
+        fill(0);
+        noStroke();
+        textAlign("left", "center");
+        textSize(10);
+        text("Fewer jobs", legendX + 35, legendY + 20);
+        text("Medium", legendX + 35, legendY + 40);
+        text("More jobs", legendX + 35, legendY + 65);
     };
 }
